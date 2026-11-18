@@ -114,6 +114,10 @@ USE_I18N = True
 USE_TZ = True
 
 
+# Credenciales de WhatsApp API
+WHATSAPP_TOKEN = "EAAQNuSozRO8BTI2sgyXCy3trjdtotttRFV4vbY3rCVWOCIraKz7XPUA1B78ns9jfFP4ug8aDGTVDhnQ7XKaV0ZBafwYZBKz8udrtus0mF84std0zqlPq0LmJcU6m1UMCw1d1WZAB29fIJsivD0u3iq8TutBiHhIU8LfQKxn03CmLfI4IuOFGEO0TexFMWlc6gZDZD"
+WHATSAPP_PHONE_ID = '1452955024566017'
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
