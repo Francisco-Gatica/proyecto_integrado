@@ -1,9 +1,9 @@
+from django.conf import settings
 from django.db import models
-
 
 class AsistenteDental(models.Model):
     id_asistente = models.IntegerField(primary_key=True)
-    id_usuario = models.ForeignKey('Usuario', on_delete=models.DO_NOTHING, db_column='id_usuario', blank=True, null=True)
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, db_column='id_usuario', blank=True, null=True)
     telefono = models.CharField(max_length=15, blank=True, null=True)
     horarioatencion = models.TimeField(blank=True, null=True)
 
@@ -40,7 +40,7 @@ class CitaMedica(models.Model):
 
 class Doctor(models.Model):
     id_doctor = models.IntegerField(primary_key=True)
-    id_usuario = models.ForeignKey('Usuario', on_delete=models.DO_NOTHING, db_column='id_usuario', blank=True, null=True)
+    id_usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING, db_column='id_usuario', blank=True, null=True)
     especialidad = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
@@ -63,15 +63,3 @@ class Paciente(models.Model):
     class Meta:
         managed = True
         db_table = 'paciente'
-
-
-class Usuario(models.Model):
-    id_usuario = models.IntegerField(primary_key=True)
-    nombre = models.CharField(max_length=100, blank=True, null=True)
-    apellido = models.CharField(max_length=100, blank=True, null=True)
-    correo = models.CharField(unique=True, max_length=100, blank=True, null=True)
-    contrasena_hash = models.CharField(max_length=200, blank=True, null=True)
-
-    class Meta:
-        managed = True
-        db_table = 'usuario'
