@@ -10,11 +10,16 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
+import dj_database_url
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / '.env')
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -74,14 +79,12 @@ WSGI_APPLICATION = 'proyecto_integrado.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'proyecto_integrado',
-        'USER': 'francisco_gatica',
-        'PASSWORD': 'figc1234',
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -115,8 +118,8 @@ USE_TZ = True
 
 
 # Credenciales de WhatsApp API
-WHATSAPP_TOKEN = "EAAQNuSozRO8BTI2sgyXCy3trjdtotttRFV4vbY3rCVWOCIraKz7XPUA1B78ns9jfFP4ug8aDGTVDhnQ7XKaV0ZBafwYZBKz8udrtus0mF84std0zqlPq0LmJcU6m1UMCw1d1WZAB29fIJsivD0u3iq8TutBiHhIU8LfQKxn03CmLfI4IuOFGEO0TexFMWlc6gZDZD"
-WHATSAPP_PHONE_ID = '1452955024566017'
+WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
+WHATSAPP_PHONE_ID = os.getenv('WHATSAPP_PHONE_ID')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
