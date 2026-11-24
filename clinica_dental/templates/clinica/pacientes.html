@@ -1,0 +1,239 @@
+{% extends 'main.html' %}
+{% load static %}
+
+{% block title %}Directorio de Pacientes - Clínica Dr. Juan Ignacio Hebel{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-3 borde-pizarra">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                        <h2 class="card-title fw-bold mb-1">Directorio de Pacientes</h2>
+                        <p class="text-muted mb-0">Gestión de fichas clínicas e información de contacto</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'index' %}" class="btn btn-outline-secondary rounded-pill px-3">
+                            &larr; Volver al Calendario
+                        </a>
+                        <button type="button" class="btn btn-pizarra rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNuevoPacienteDirectorio">
+                            + Registrar Paciente
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Buscador y estadísticas -->
+<div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-4">
+    <form method="GET" action="{% url 'pacientes' %}" class="row g-2 align-items-center">
+        <div class="col-md-9 col-lg-10">
+            <div class="input-group">
+                <span class="input-group-text bg-light text-muted">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+                    </svg>
+                </span>
+                <input type="text" name="q" class="form-control" placeholder="Buscar por nombre, apellido o RUT..." value="{{ query }}">
+            </div>
+        </div>
+        <div class="col-md-3 col-lg-2 d-grid">
+            <button type="submit" class="btn btn-pizarra rounded-pill">Buscar</button>
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de Pacientes -->
+<div class="card border-0 shadow-sm rounded-3 overflow-hidden bg-white">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">RUT</th>
+                    <th>Nombre Completo</th>
+                    <th>F. Nacimiento</th>
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Estado</th>
+                    <th class="text-end pe-4">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pac in pacientes %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="badge bg-light text-dark border px-2 py-1">{{ pac.rut|default:'Sin RUT' }}</span>
+                        </td>
+                        <td class="fw-bold text-dark">
+                            {{ pac.nombre }} {{ pac.primer_apellido }} {{ pac.segundo_apellido|default:'' }}
+                        </td>
+                        <td>{{ pac.fecha_nacimiento|date:'d/m/Y'|default:'-' }}</td>
+                        <td>{{ pac.telefono|default:'-' }}</td>
+                        <td>{{ pac.correo|default:'-' }}</td>
+                        <td>
+                            {% if pac.activo %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1">Activo</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-3 py-1">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <button type="button" class="btn btn-sm btn-outline-pizarra rounded-pill px-3"
+                                    onclick="abrirModalEditarPaciente(
+                                        '{{ pac.id_paciente }}',
+                                        '{{ pac.rut|default:'' }}',
+                                        '{{ pac.nombre|escapejs }}',
+                                        '{{ pac.primer_apellido|escapejs }}',
+                                        '{{ pac.segundo_apellido|default:''|escapejs }}',
+                                        '{{ pac.telefono|default:'' }}',
+                                        '{{ pac.correo|default:'' }}',
+                                        '{{ pac.activo|yesno:'true,false' }}',
+                                        '{{ pac.fecha_nacimiento|date:'Y-m-d'|default:'' }}'
+                                    )"
+                                    title="Modificar datos del paciente">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-pencil-square me-1" viewBox="0 0 16 16">
+                                    <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                                    <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5z"/>
+                                </svg>
+                                Modificar
+                            </button>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <p class="mb-2">No se encontraron pacientes registrados.</p>
+                            <button type="button" class="btn btn-sm btn-pizarra rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalNuevoPacienteDirectorio">
+                                + Registrar Primer Paciente
+                            </button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Registrar Paciente -->
+<div class="modal fade" id="modalNuevoPacienteDirectorio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold">Registrar Nuevo Paciente</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="POST" action="{% url 'paciente_crear' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Nombre *</label>
+                            <input type="text" name="nombre" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Primer Apellido *</label>
+                            <input type="text" name="primer_apellido" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary">Segundo Apellido</label>
+                        <input type="text" name="segundo_apellido" class="form-control">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">RUT</label>
+                            <input type="text" name="rut" class="form-control" placeholder="Ej: 12345678-9">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Fecha de Nacimiento *</label>
+                            <input type="date" name="fecha_nacimiento" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Teléfono</label>
+                            <input type="tel" name="telefono" class="form-control" placeholder="+56 9...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-secondary">Correo Electrónico</label>
+                            <input type="email" name="correo" class="form-control" placeholder="ejemplo@correo.com">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-pizarra rounded-pill px-4">Guardar Paciente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- Modal Modificar Paciente -->
+<div class="modal fade" id="modalEditarPaciente" tabindex="-1" aria-labelledby="modalEditarPacienteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold" id="modalEditarPacienteLabel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-person-gear me-2" viewBox="0 0 16 16">
+                        <path d="M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m.256 7a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 7 10q.39 0 .753.078c.07.135.153.267.247.394q.14.188.312.352c-.378-.052-.767-.074-1.162-.074-1.667 0-2.613.62-3.16 1.275C3.24 12.656 3.075 13.424 3.075 13.68H8.256z"/>
+                        <path d="M16 12.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0m-1.993-1.679a.5.5 0 0 0-.453-.086l-.42.168-.293-.293a.5.5 0 0 0-.707 0l-.293.293-.42-.168a.5.5 0 0 0-.453.086l-.286.286a.5.5 0 0 0-.086.453l.168.42-.293.293a.5.5 0 0 0 0 .707l.293.293-.168.42a.5.5 0 0 0 .086.453l.286.286a.5.5 0 0 0 .453.086l.42-.168.293.293a.5.5 0 0 0 .707 0l.293-.293.42.168a.5.5 0 0 0 .453-.086l.286-.286a.5.5 0 0 0 .086-.453l-.168-.42.293-.293a.5.5 0 0 0 0-.707l-.293-.293.168-.42a.5.5 0 0 0-.086-.453zM12.5 14a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>
+                    </svg>
+                    Modificar Datos del Paciente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form id="formEditarPaciente" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label for="editarNombrePaciente" class="form-label small fw-bold text-secondary">Nombre *</label>
+                            <input type="text" name="nombre" id="editarNombrePaciente" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editarPrimerApellidoPaciente" class="form-label small fw-bold text-secondary">Primer Apellido *</label>
+                            <input type="text" name="primer_apellido" id="editarPrimerApellidoPaciente" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editarSegundoApellidoPaciente" class="form-label small fw-bold text-secondary">Segundo Apellido</label>
+                        <input type="text" name="segundo_apellido" id="editarSegundoApellidoPaciente" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editarRutPaciente" class="form-label small fw-bold text-secondary">RUT</label>
+                        <input type="text" name="rut" id="editarRutPaciente" class="form-control" placeholder="Ej: 12345678-9">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label for="editarTelefonoPaciente" class="form-label small fw-bold text-secondary">Teléfono</label>
+                            <input type="tel" name="telefono" id="editarTelefonoPaciente" class="form-control" placeholder="+56 9...">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editarFechaNacimientoPaciente" class="form-label small fw-bold text-secondary">Fecha Nacimiento *</label>
+                            <input type="date" name="fecha_nacimiento" id="editarFechaNacimientoPaciente" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editarCorreoPaciente" class="form-label small fw-bold text-secondary">Correo Electrónico</label>
+                        <input type="email" name="correo" id="editarCorreoPaciente" class="form-control" placeholder="ejemplo@correo.com">
+                    </div>
+                    <div class="mb-2">
+                        <label for="editarActivoPaciente" class="form-label small fw-bold text-secondary">Estado del Paciente</label>
+                        <select name="activo" id="editarActivoPaciente" class="form-select">
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-pizarra rounded-pill px-4">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,247 @@
+<!-- ========================================================================== -->
+<!-- MODALES Y FORMULARIOS DE CITAS MÉDICAS (CREACIÓN, EDICIÓN Y ELIMINACIÓN)  -->
+<!-- Archivo: clinica_dental/templates/clinica/cita_medica.html                 -->
+<!-- ========================================================================== -->
+
+<!-- ========================================== -->
+<!-- 1. MODAL: AGENDAR NUEVA CITA MÉDICA        -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalNuevaCita" tabindex="-1" aria-labelledby="modalNuevaCitaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold" id="modalNuevaCitaLabel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-calendar-plus me-2" viewBox="0 0 16 16">
+                        <path d="M8 7a.5.5 0 0 1 .5.5V9H10a.5.5 0 0 1 0 1H8.5v1.5a.5.5 0 0 1-1 0V10H6a.5.5 0 0 1 0-1h1.5V7.5A.5.5 0 0 1 8 7"/>
+                        <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                    Agendar Nueva Hora de Atención
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            
+            <form method="POST" action="{% url 'cita_crear' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    
+                    <!-- Fecha y Horas -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="nuevaFecha" class="form-label small fw-bold text-secondary">Fecha</label>
+                            <input type="date" name="fecha" id="nuevaFecha" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="nuevaHoraInicio" class="form-label small fw-bold text-secondary">Hora Inicio</label>
+                            <input type="time" name="hora_inicio" id="nuevaHoraInicio" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="nuevaHoraFin" class="form-label small fw-bold text-secondary">Hora Fin</label>
+                            <input type="time" name="hora_fin" id="nuevaHoraFin" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Doctor y Estado -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="nuevoDoctor" class="form-label small fw-bold text-secondary">Doctor / Especialista</label>
+                            <select name="id_doctor" id="nuevoDoctor" class="form-select">
+                                <option value="">-- Sin doctor asignado --</option>
+                                {% for doc in doctores %}
+                                    <option value="{{ doc.id_doctor }}">
+                                        Dr(a). {{ doc.id_usuario.get_full_name|default:doc.id_usuario.username }} ({{ doc.especialidad }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="nuevoEstado" class="form-label small fw-bold text-secondary">Estado de la Cita</label>
+                            <select name="estado" id="nuevoEstado" class="form-select">
+                                <option value="Pendiente" selected>Pendiente</option>
+                                <option value="Confirmada">Confirmada</option>
+                                <option value="Realizada">Realizada</option>
+                                <option value="Cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pestañas para selección o registro de paciente -->
+                    <div class="card border rounded-3 p-3 bg-light mb-3">
+                        <h6 class="fw-bold text-dark mb-3">Datos del Paciente</h6>
+                        <div class="btn-group w-100 mb-3" role="group">
+                            <input type="radio" class="btn-check" name="tipo_paciente" id="tipoExistente" value="existente" checked onchange="toggleFormPaciente(this.value)">
+                            <label class="btn btn-outline-secondary" for="tipoExistente">Seleccionar Paciente Existente</label>
+
+                            <input type="radio" class="btn-check" name="tipo_paciente" id="tipoNuevo" value="nuevo" onchange="toggleFormPaciente(this.value)">
+                            <label class="btn btn-outline-secondary" for="tipoNuevo">+ Registrar Nuevo Paciente</label>
+                        </div>
+
+                        <!-- Paciente Existente -->
+                        <div id="seccionPacienteExistente">
+                            <label for="selectPacienteExistente" class="form-label small fw-semibold text-secondary">Seleccione de la lista:</label>
+                            <select name="id_paciente" id="selectPacienteExistente" class="form-select">
+                                <option value="">-- Seleccionar paciente --</option>
+                                {% for pac in pacientes %}
+                                    <option value="{{ pac.id_paciente }}">
+                                        {{ pac.nombre }} {{ pac.primer_apellido }} {% if pac.segundo_apellido %}{{ pac.segundo_apellido }}{% endif %} (RUT: {{ pac.rut|default:'Sin RUT' }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Nuevo Paciente -->
+                        <div id="seccionPacienteNuevo" style="display: none;">
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <input type="text" name="nombre_paciente" class="form-control form-control-sm" placeholder="Nombre *">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="primer_apellido_paciente" class="form-control form-control-sm" placeholder="Primer Apellido *">
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="segundo_apellido_paciente" class="form-control form-control-sm" placeholder="Segundo Apellido">
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <input type="text" name="rut_paciente" class="form-control form-control-sm" placeholder="RUT (ej: 12345678-9)">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="date" name="fecha_nacimiento_paciente" class="form-control form-control-sm" title="Fecha de Nacimiento">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="tel" name="telefono_paciente" class="form-control form-control-sm" placeholder="Teléfono (+56 9...)">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="email" name="correo_paciente" class="form-control form-control-sm" placeholder="Correo electrónico">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Motivo de Consulta -->
+                    <div class="mb-2">
+                        <label for="nuevoMotivo" class="form-label small fw-bold text-secondary">Motivo de la Consulta / Tratamiento</label>
+                        <textarea name="motivo_consulta" id="nuevoMotivo" rows="2" class="form-control" placeholder="Ej: Control general, limpieza dental, evaluación de ortodoncia..."></textarea>
+                    </div>
+
+                </div>
+                
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-pizarra rounded-pill px-4">Agendar Cita</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 2. MODAL: DETALLE, MODIFICAR Y ELIMINAR CITA -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalDetalleCita" tabindex="-1" aria-labelledby="modalDetalleCitaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold" id="modalDetalleCitaLabel">
+                    Modificar Hora de Atención
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <form id="formEditarCita" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                        <div>
+                            <span class="small text-muted">Paciente asignado:</span>
+                            <h5 class="fw-bold text-primary mb-0" id="detalleNombrePaciente">-</h5>
+                        </div>
+                        <span id="detalleBadgeEstado" class="badge bg-secondary p-2 px-3 rounded-pill fs-6">-</span>
+                    </div>
+
+                    <!-- Cambiar Paciente -->
+                    <div class="mb-3">
+                        <label for="editarPaciente" class="form-label small fw-bold text-secondary">Reasignar Paciente</label>
+                        <select name="id_paciente" id="editarPaciente" class="form-select">
+                            <option value="">-- Sin paciente asignado --</option>
+                            {% for pac in pacientes %}
+                                <option value="{{ pac.id_paciente }}">
+                                    {{ pac.nombre }} {{ pac.primer_apellido }} {% if pac.segundo_apellido %}{{ pac.segundo_apellido }}{% endif %} (RUT: {{ pac.rut|default:'Sin RUT' }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Fecha y Horas -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label for="editarFecha" class="form-label small fw-bold text-secondary">Fecha</label>
+                            <input type="date" name="fecha" id="editarFecha" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editarHoraInicio" class="form-label small fw-bold text-secondary">Hora Inicio</label>
+                            <input type="time" name="hora_inicio" id="editarHoraInicio" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="editarHoraFin" class="form-label small fw-bold text-secondary">Hora Fin</label>
+                            <input type="time" name="hora_fin" id="editarHoraFin" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Doctor y Estado -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="editarDoctor" class="form-label small fw-bold text-secondary">Doctor / Especialista</label>
+                            <select name="id_doctor" id="editarDoctor" class="form-select">
+                                <option value="">-- Sin doctor asignado --</option>
+                                {% for doc in doctores %}
+                                    <option value="{{ doc.id_doctor }}">
+                                        Dr(a). {{ doc.id_usuario.get_full_name|default:doc.id_usuario.username }} ({{ doc.especialidad }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editarEstado" class="form-label small fw-bold text-secondary">Estado</label>
+                            <select name="estado" id="editarEstado" class="form-select">
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="Confirmada">Confirmada</option>
+                                <option value="Realizada">Realizada</option>
+                                <option value="Cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Motivo -->
+                    <div class="mb-2">
+                        <label for="editarMotivo" class="form-label small fw-bold text-secondary">Motivo de la Consulta</label>
+                        <textarea name="motivo_consulta" id="editarMotivo" rows="2" class="form-control"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer bg-light d-flex justify-content-between">
+                    <!-- Botón Eliminar Cita -->
+                    <button type="button" class="btn btn-outline-danger rounded-pill px-3" onclick="solicitarEliminarCita()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash me-1" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                        </svg>
+                        Eliminar Cita
+                    </button>
+
+                    <div>
+                        <button type="button" class="btn btn-secondary rounded-pill px-4 me-2" data-bs-dismiss="modal">Cerrar</button>
+                        <button type="submit" class="btn btn-pizarra rounded-pill px-4">Guardar Cambios</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Formulario oculto para eliminar -->
+            <form id="formEliminarCitaOculto" method="POST" action="" style="display: none;">
+                {% csrf_token %}
+            </form>
+        </div>
+    </div>
+</div>

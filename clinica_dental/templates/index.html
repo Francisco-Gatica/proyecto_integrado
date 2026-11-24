@@ -1,0 +1,244 @@
+{% extends 'main.html' %}
+{% load static %}
+
+{% block title %}Calendario de Atención - Clínica Dr. Juan Ignacio Hebel{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="row g-4 align-items-start">
+        <!-- Barra Lateral con Botones Píldora (según mockup de la imagen) -->
+        <div class="col-12 col-md-3 col-lg-2">
+            <div class="sticky-top" style="top: 20px; z-index: 10;">
+                <button type="button" class="sidebar-pill-btn active" onclick="location.reload();">
+                    Calendario
+                </button>
+                <button type="button" class="sidebar-pill-btn" data-bs-toggle="modal" data-bs-target="#modalPacientes">
+                    Pacientes
+                </button>
+                <button type="button" class="sidebar-pill-btn" onclick="abrirModalNuevaCita('{{ hoy_iso }}', '09:00', '10:00')">
+                    + Nueva cita
+                </button>
+                <!-- Resumen de estado de citas -->
+                <div class="card border-0 shadow-sm rounded-3 mt-4 d-none d-md-block p-3 bg-white">
+                    <h6 class="fw-bold text-secondary small text-uppercase mb-2">Leyenda de Estados</h6>
+                    <div class="d-flex align-items-center mb-1 small">
+                        <span class="badge bg-success me-2" style="width: 12px; height: 12px; padding: 0;"> </span>
+                        <span>Confirmada</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-1 small">
+                        <span class="badge bg-warning text-dark me-2" style="width: 12px; height: 12px; padding: 0;"> </span>
+                        <span>Pendiente</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-1 small">
+                        <span class="badge bg-primary me-2" style="width: 12px; height: 12px; padding: 0;"> </span>
+                        <span>Realizada</span>
+                    </div>
+                    <div class="d-flex align-items-center small">
+                        <span class="badge bg-danger me-2" style="width: 12px; height: 12px; padding: 0;"> </span>
+                        <span>Cancelada</span>
+                    </div>
+                    <hr class="my-2">
+                    <small class="text-muted">Citas esta semana: <strong>{{ total_citas_semana }}</strong></small>
+                </div>
+            </div>
+        </div>
+        <!-- Área Principal: Calendario Semanal de Atención -->
+        <div class="col-12 col-md-9 col-lg-10">
+            <!-- Barra de Navegación de la Semana -->
+            <div class="week-nav-bar d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="?fecha={{ semana_anterior }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Semana anterior">
+                        &larr; Anterior
+                    </a>
+                    <a href="?fecha={{ hoy_iso }}" class="btn btn-sm btn-pizarra rounded-pill px-3">
+                        Hoy
+                    </a>
+                    <a href="?fecha={{ semana_siguiente }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Semana siguiente">
+                        Siguiente &rarr;
+                    </a>
+                </div>
+                <div class="text-center">
+                    <h5 class="fw-bold text-dark mb-0">
+                        {{ rango_semana_str }}
+                    </h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label for="inputIrAFecha" class="small text-muted fw-semibold d-none d-sm-inline">Ir a fecha:</label>
+                    <input type="date" id="inputIrAFecha" class="form-control form-control-sm rounded-pill" value="{{ fecha_seleccionada }}" onchange="location.href='?fecha=' + this.value">
+                </div>
+            </div>
+            <!-- Grilla del Calendario (Fiel al diseño con fondo pizarra y días en filas) -->
+            <div class="calendar-container">
+                <div class="calendar-banner-header">
+                    Calendario
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-calendar">
+                        <thead>
+                            <tr>
+                                <th style="width: 125px; background-color: #587690; border: 1px solid #485f75 !important;"></th>
+                                {% for slot in slots_horarios %}
+                                    <th class="calendar-time-header">
+                                        {{ slot.hora_str }}
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dia in dias_semana %}
+                                <tr>
+                                    <!-- Cabecera del día (LUNES, MARTES, MIÉRCOLES, JUEVES, VIERNES) -->
+                                    <th class="calendar-day-header">
+                                        {{ dia.nombre }}
+                                        <div class="small fw-normal opacity-75 mt-1">{{ dia.fecha_str }}</div>
+                                    </th>
+                                    <!-- Celdas para cada bloque de hora -->
+                                    {% for slot_data in dia.slots %}
+                                        <td class="calendar-cell">
+                                            {% if slot_data.citas %}
+                                                {% for cita in slot_data.citas %}
+                                                    <div class="cita-chip status-{{ cita.estado|lower }}" 
+                                                         onclick="abrirModalDetalleCita(
+                                                             '{{ cita.id_cita }}',
+                                                             '{{ cita.fecha|date:'Y-m-d' }}',
+                                                             '{{ cita.hora_inicio|time:'H:i' }}',
+                                                             '{{ cita.hora_fin|time:'H:i' }}',
+                                                             '{{ cita.id_doctor.id_doctor|default:'' }}',
+                                                             '{{ cita.paciente.id_paciente|default:'' }}',
+                                                             '{{ cita.paciente.nombre|default:'' }} {{ cita.paciente.primer_apellido|default:'' }}',
+                                                             '{{ cita.estado|default:'Pendiente' }}',
+                                                             '{{ cita.motivo_consulta|escapejs }}'
+                                                         )"
+                                                         title="Ver o modificar cita">
+                                                        <div class="cita-chip-time">
+                                                            {{ cita.hora_inicio|time:'H:i' }} - {{ cita.hora_fin|time:'H:i' }}
+                                                        </div>
+                                                        <span class="cita-chip-name">
+                                                            {% if cita.paciente %}
+                                                                {{ cita.paciente.nombre }} {{ cita.paciente.primer_apellido }}
+                                                            {% else %}
+                                                                (Sin paciente)
+                                                            {% endif %}
+                                                        </span>
+                                                        {% if cita.id_doctor %}
+                                                            <small class="text-muted d-block" style="font-size: 0.65rem;">
+                                                                Dr. {{ cita.id_doctor.id_usuario.last_name|default:cita.id_doctor.especialidad }}
+                                                            </small>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <!-- Celda vacía con disparador para agendar al hacer click -->
+                                                <div class="cell-add-btn" 
+                                                     onclick="abrirModalNuevaCita('{{ dia.fecha_iso }}', '{{ slot_data.slot.inicio|time:'H:i' }}', '{{ slot_data.slot.fin|time:'H:i' }}')"
+                                                     title="Agendar cita en este horario">
+                                                    +
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% include 'clinica/cita_medica.html' %}
+<!-- Modal Paciente -->
+<div class="modal fade" id="modalPacientes" tabindex="-1" aria-labelledby="modalPacientesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold" id="modalPacientesLabel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-people me-2" viewBox="0 0 16 16">
+                        <path d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0m3-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4"/>
+                    </svg>
+                    Directorio de Pacientes
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Buscador de pacientes -->
+                <div class="d-flex gap-2 mb-3">
+                    <input type="text" id="filtroPacientesInput" class="form-control rounded-pill" placeholder="Buscar por nombre o RUT..." onkeyup="filtrarTablaPacientes()">
+                    <button class="btn btn-outline-secondary rounded-pill px-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNuevoPaciente">
+                        + Registrar Paciente
+                    </button>
+                </div>
+                <!-- Formulario desplegable para nuevo paciente -->
+                <div class="collapse mb-4" id="collapseNuevoPaciente">
+                    <div class="card card-body bg-light border p-3">
+                        <h6 class="fw-bold mb-2 text-dark">Registrar Nuevo Paciente</h6>
+                        <form method="POST" action="{% url 'paciente_crear' %}">
+                            {% csrf_token %}
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <input type="text" name="nombre" class="form-control form-control-sm" placeholder="Nombre *" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="primer_apellido" class="form-control form-control-sm" placeholder="Primer Apellido *" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <input type="text" name="segundo_apellido" class="form-control form-control-sm" placeholder="Segundo Apellido">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-3">
+                                    <input type="text" name="rut" class="form-control form-control-sm" placeholder="RUT (ej: 12345678-9)">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="date" name="fecha_nacimiento" class="form-control form-control-sm" title="Fecha de Nacimiento *" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="tel" name="telefono" class="form-control form-control-sm" placeholder="Teléfono (+56 9...)">
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="email" name="correo" class="form-control form-control-sm" placeholder="Correo electrónico">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-pizarra rounded-pill px-3">Guardar Paciente</button>
+                        </form>
+                    </div>
+                </div>
+                <!-- Tabla de Pacientes -->
+                <div class="table-responsive" style="max-height: 380px;">
+                    <table class="table table-hover table-striped align-middle" id="tablaPacientesModal">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>RUT</th>
+                                <th>Nombre Completo</th>
+                                <th>F. Nacimiento</th>
+                                <th>Teléfono</th>
+                                <th>Correo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pac in pacientes %}
+                                <tr>
+                                    <td><span class="badge bg-light text-dark border">{{ pac.rut|default:'Sin RUT' }}</span></td>
+                                    <td class="fw-semibold text-dark">{{ pac.nombre }} {{ pac.primer_apellido }} {{ pac.segundo_apellido|default:'' }}</td>
+                                    <td>{{ pac.fecha_nacimiento|date:'d/m/Y'|default:'-' }}</td>
+                                    <td>{{ pac.telefono|default:'-' }}</td>
+                                    <td>{{ pac.correo|default:'-' }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">No hay pacientes registrados aún.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-light d-flex justify-content-between">
+                <a href="{% url 'pacientes' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Ver catálogo completo</a>
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
