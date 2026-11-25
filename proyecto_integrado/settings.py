@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 import dj_database_url
 from dotenv import load_dotenv
@@ -30,7 +31,7 @@ SECRET_KEY = 'django-insecure-u93wzxkzs4pl)o0_9s&(in8hia#6n#%w(_d+n8dc%ns-0^s9cu
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -89,6 +90,12 @@ DATABASES = {
     )
 }
 
+if 'test' in sys.argv and not os.getenv('USE_REMOTE_TEST_DB'):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
 
@@ -119,10 +126,19 @@ USE_I18N = True
 
 USE_TZ = True
 
+DATE_FORMAT = 'd/m/Y'
+SHORT_DATE_FORMAT = 'd/m/Y'
+DATE_INPUT_FORMATS = ['%d/%m/%Y', '%Y-%m-%d']
+
 
 # Credenciales de WhatsApp API
 WHATSAPP_TOKEN = os.getenv('WHATSAPP_TOKEN')
 WHATSAPP_PHONE_ID = os.getenv('WHATSAPP_PHONE_ID')
+WHATSAPP_API_VERSION = os.getenv('WHATSAPP_API_VERSION', 'v21.0')
+WHATSAPP_TEST_TEMPLATE = os.getenv('WHATSAPP_TEST_TEMPLATE', 'hello_world')
+WHATSAPP_TEST_LANGUAGE = os.getenv('WHATSAPP_TEST_LANGUAGE', 'en_US')
+WHATSAPP_REMINDER_TEMPLATE = os.getenv('WHATSAPP_REMINDER_TEMPLATE', '')
+WHATSAPP_REMINDER_LANGUAGE = os.getenv('WHATSAPP_REMINDER_LANGUAGE', 'es')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.1/howto/static-files/

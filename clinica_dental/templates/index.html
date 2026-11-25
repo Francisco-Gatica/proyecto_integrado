@@ -1,5 +1,5 @@
 {% extends 'main.html' %}
-{% load static %}
+{% load static clinica_filters %}
 
 {% block title %}Calendario de Atención - Clínica Dr. Juan Ignacio Hebel{% endblock %}
 
@@ -17,6 +17,9 @@
                 </button>
                 <button type="button" class="sidebar-pill-btn" onclick="abrirModalNuevaCita('{{ hoy_iso }}', '09:00', '10:00')">
                     + Nueva cita
+                </button>
+                <button type="button" class="sidebar-pill-btn" data-bs-toggle="modal" data-bs-target="#modalPruebaWhatsapp">
+                    Probar WhatsApp
                 </button>
                 <!-- Resumen de estado de citas -->
                 <div class="card border-0 shadow-sm rounded-3 mt-4 d-none d-md-block p-3 bg-white">
@@ -64,7 +67,7 @@
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <label for="inputIrAFecha" class="small text-muted fw-semibold d-none d-sm-inline">Ir a fecha:</label>
-                    <input type="date" id="inputIrAFecha" class="form-control form-control-sm rounded-pill" value="{{ fecha_seleccionada }}" onchange="location.href='?fecha=' + this.value">
+                    <input type="text" id="inputIrAFecha" class="form-control form-control-sm rounded-pill" value="{{ fecha_seleccionada }}" placeholder="DD/MM/YYYY" maxlength="10" data-date-mask="true" onchange="irAFecha(this.value)">
                 </div>
             </div>
             <!-- Grilla del Calendario (Fiel al diseño con fondo pizarra y días en filas) -->
@@ -101,7 +104,7 @@
                                                     <div class="cita-chip status-{{ cita.estado|lower }}" 
                                                          onclick="abrirModalDetalleCita(
                                                              '{{ cita.id_cita }}',
-                                                             '{{ cita.fecha|date:'Y-m-d' }}',
+                                                             '{{ cita.fecha|date:'d/m/Y' }}',
                                                              '{{ cita.hora_inicio|time:'H:i' }}',
                                                              '{{ cita.hora_fin|time:'H:i' }}',
                                                              '{{ cita.id_doctor.id_doctor|default:'' }}',
@@ -131,7 +134,7 @@
                                             {% else %}
                                                 <!-- Celda vacía con disparador para agendar al hacer click -->
                                                 <div class="cell-add-btn" 
-                                                     onclick="abrirModalNuevaCita('{{ dia.fecha_iso }}', '{{ slot_data.slot.inicio|time:'H:i' }}', '{{ slot_data.slot.fin|time:'H:i' }}')"
+                                                     onclick="abrirModalNuevaCita('{{ dia.fecha_str }}', '{{ slot_data.slot.inicio|time:'H:i' }}', '{{ slot_data.slot.fin|time:'H:i' }}')"
                                                      title="Agendar cita en este horario">
                                                     +
                                                 </div>
@@ -188,13 +191,13 @@
                             </div>
                             <div class="row g-2 mb-3">
                                 <div class="col-md-3">
-                                    <input type="text" name="rut" class="form-control form-control-sm" placeholder="RUT (ej: 12345678-9)">
+                                    <input type="text" name="rut" class="form-control form-control-sm" placeholder="RUT (11111111-1)" pattern="\d{7,8}-[0-9Kk]" maxlength="10" data-rut-input="true" title="Formato requerido: 11111111-1">
                                 </div>
                                 <div class="col-md-3">
-                                    <input type="date" name="fecha_nacimiento" class="form-control form-control-sm" title="Fecha de Nacimiento *" required>
+                                    <input type="text" name="fecha_nacimiento" class="form-control form-control-sm" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" data-date-mask="true" title="Fecha de Nacimiento (DD/MM/YYYY) *" required>
                                 </div>
                                 <div class="col-md-3">
-                                    <input type="tel" name="telefono" class="form-control form-control-sm" placeholder="Teléfono (+56 9...)">
+                                    <input type="tel" name="telefono" class="form-control form-control-sm" placeholder="+56 9 1111 1111" pattern="\+56 9 \d{4} \d{4}" maxlength="15" data-phone-mask="true" title="Formato requerido: +56 9 1111 1111">
                                 </div>
                                 <div class="col-md-3">
                                     <input type="email" name="correo" class="form-control form-control-sm" placeholder="Correo electrónico">
@@ -222,7 +225,7 @@
                                     <td><span class="badge bg-light text-dark border">{{ pac.rut|default:'Sin RUT' }}</span></td>
                                     <td class="fw-semibold text-dark">{{ pac.nombre }} {{ pac.primer_apellido }} {{ pac.segundo_apellido|default:'' }}</td>
                                     <td>{{ pac.fecha_nacimiento|date:'d/m/Y'|default:'-' }}</td>
-                                    <td>{{ pac.telefono|default:'-' }}</td>
+                                    <td>{{ pac.telefono|formato_telefono|default:'-' }}</td>
                                     <td>{{ pac.correo|default:'-' }}</td>
                                 </tr>
                             {% empty %}
@@ -238,6 +241,50 @@
                 <a href="{% url 'pacientes' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Ver catálogo completo</a>
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
             </div>
+        </div>
+    </div>
+</div>
+<!-- Modal Prueba WhatsApp -->
+<div class="modal fade" id="modalPruebaWhatsapp" tabindex="-1" aria-labelledby="modalPruebaWhatsappLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-pizarra text-white">
+                <h5 class="modal-title fw-bold" id="modalPruebaWhatsappLabel">
+                    Probar Integración WhatsApp API
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <form method="POST" action="{% url 'whatsapp_prueba' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">
+                        Envía un mensaje de prueba a un número habilitado en Meta WhatsApp Cloud API (incluye código de país, ej: <code>+56 9 1111 1111</code>).
+                    </p>
+                    <div class="mb-3">
+                        <label for="whatsappTelefonoPrueba" class="form-label small fw-bold text-secondary">Teléfono Destino *</label>
+                        <input type="tel" name="telefono" id="whatsappTelefonoPrueba" class="form-control" placeholder="+56 9 1111 1111" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="whatsappModoPrueba" class="form-label small fw-bold text-secondary">Tipo de Mensaje</label>
+                        <select name="modo" id="whatsappModoPrueba" class="form-select">
+                            <option value="plantilla" selected>Plantilla de prueba (hello_world)</option>
+                            <option value="texto">Mensaje de texto libre (requiere ventana de 24h)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="whatsappNombrePrueba" class="form-label small fw-bold text-secondary">Nombre de Referencia</label>
+                        <input type="text" name="nombre_paciente" id="whatsappNombrePrueba" class="form-control" value="Paciente de Prueba">
+                    </div>
+                    <div class="mb-2">
+                        <label for="whatsappMensajePrueba" class="form-label small fw-bold text-secondary">Mensaje Personalizado (solo modo texto)</label>
+                        <textarea name="mensaje" id="whatsappMensajePrueba" rows="2" class="form-control" placeholder="Opcional: texto personalizado para comprobar el envío..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-pizarra rounded-pill px-4">Enviar Mensaje de Prueba</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

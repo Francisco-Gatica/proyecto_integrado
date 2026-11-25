@@ -1,5 +1,5 @@
 {% extends 'main.html' %}
-{% load static %}
+{% load static clinica_filters %}
 
 {% block title %}Directorio de Pacientes - Clínica Dr. Juan Ignacio Hebel{% endblock %}
 
@@ -71,7 +71,7 @@
                             {{ pac.nombre }} {{ pac.primer_apellido }} {{ pac.segundo_apellido|default:'' }}
                         </td>
                         <td>{{ pac.fecha_nacimiento|date:'d/m/Y'|default:'-' }}</td>
-                        <td>{{ pac.telefono|default:'-' }}</td>
+                        <td>{{ pac.telefono|formato_telefono|default:'-' }}</td>
                         <td>{{ pac.correo|default:'-' }}</td>
                         <td>
                             {% if pac.activo %}
@@ -88,10 +88,10 @@
                                         '{{ pac.nombre|escapejs }}',
                                         '{{ pac.primer_apellido|escapejs }}',
                                         '{{ pac.segundo_apellido|default:''|escapejs }}',
-                                        '{{ pac.telefono|default:'' }}',
+                                        '{{ pac.telefono|formato_telefono|default:'' }}',
                                         '{{ pac.correo|default:'' }}',
                                         '{{ pac.activo|yesno:'true,false' }}',
-                                        '{{ pac.fecha_nacimiento|date:'Y-m-d'|default:'' }}'
+                                        '{{ pac.fecha_nacimiento|date:'d/m/Y'|default:'' }}'
                                     )"
                                     title="Modificar datos del paciente">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-pencil-square me-1" viewBox="0 0 16 16">
@@ -145,17 +145,17 @@
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary">RUT</label>
-                            <input type="text" name="rut" class="form-control" placeholder="Ej: 12345678-9">
+                            <input type="text" name="rut" class="form-control" placeholder="11111111-1" pattern="\d{7,8}-[0-9Kk]" maxlength="10" data-rut-input="true" title="Formato requerido: 11111111-1">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-secondary">Fecha de Nacimiento *</label>
-                            <input type="date" name="fecha_nacimiento" class="form-control" required>
+                            <label class="form-label small fw-bold text-secondary">Fecha de Nacimiento (DD/MM/YYYY) *</label>
+                            <input type="text" name="fecha_nacimiento" class="form-control" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" data-date-mask="true" required>
                         </div>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary">Teléfono</label>
-                            <input type="tel" name="telefono" class="form-control" placeholder="+56 9...">
+                            <input type="tel" name="telefono" class="form-control" placeholder="+56 9 1111 1111" pattern="\+56 9 \d{4} \d{4}" maxlength="15" data-phone-mask="true" title="Formato requerido: +56 9 1111 1111">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-secondary">Correo Electrónico</label>
@@ -204,16 +204,16 @@
                     </div>
                     <div class="mb-3">
                         <label for="editarRutPaciente" class="form-label small fw-bold text-secondary">RUT</label>
-                        <input type="text" name="rut" id="editarRutPaciente" class="form-control" placeholder="Ej: 12345678-9">
+                        <input type="text" name="rut" id="editarRutPaciente" class="form-control" placeholder="11111111-1" pattern="\d{7,8}-[0-9Kk]" maxlength="10" data-rut-input="true" title="Formato requerido: 11111111-1">
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label for="editarTelefonoPaciente" class="form-label small fw-bold text-secondary">Teléfono</label>
-                            <input type="tel" name="telefono" id="editarTelefonoPaciente" class="form-control" placeholder="+56 9...">
+                            <input type="tel" name="telefono" id="editarTelefonoPaciente" class="form-control" placeholder="+56 9 1111 1111" pattern="\+56 9 \d{4} \d{4}" maxlength="15" data-phone-mask="true" title="Formato requerido: +56 9 1111 1111">
                         </div>
                         <div class="col-md-6">
-                            <label for="editarFechaNacimientoPaciente" class="form-label small fw-bold text-secondary">Fecha Nacimiento *</label>
-                            <input type="date" name="fecha_nacimiento" id="editarFechaNacimientoPaciente" class="form-control" required>
+                            <label for="editarFechaNacimientoPaciente" class="form-label small fw-bold text-secondary">Fecha Nacimiento (DD/MM/YYYY) *</label>
+                            <input type="text" name="fecha_nacimiento" id="editarFechaNacimientoPaciente" class="form-control" placeholder="DD/MM/YYYY" pattern="\d{2}/\d{2}/\d{4}" maxlength="10" data-date-mask="true" required>
                         </div>
                     </div>
                     <div class="mb-3">

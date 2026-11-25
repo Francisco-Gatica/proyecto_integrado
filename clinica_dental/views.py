@@ -12,6 +12,8 @@ from django.shortcuts import (
     get_object_or_404
 )
 from .models import AsistenteDental, Calendario, CitaMedica, Doctor, Paciente
+from .services import enviar_recordatorio_whatsapp, mensaje_prueba
+from .validators import formatear_telefono_cl, parsear_fecha, validar_rut
 
 def _obtener_siguiente_id(modelo, campo_pk):
     """
@@ -76,10 +78,7 @@ def index(request):
     """
     fecha_param = request.GET.get('fecha')
     try:
-        if fecha_param:
-            fecha_ref = datetime.date.fromisoformat(fecha_param)
-        else:
-            fecha_ref = datetime.date.today()
+        fecha_ref = parsear_fecha(fecha_param) or datetime.date.today()
     except ValueError:
         fecha_ref = datetime.date.today()
 
@@ -87,9 +86,9 @@ def index(request):
     lunes = fecha_ref - datetime.timedelta(days=fecha_ref.weekday())
     viernes = lunes + datetime.timedelta(days=4)
 
-    semana_anterior = (lunes - datetime.timedelta(days=7)).isoformat()
-    semana_siguiente = (lunes + datetime.timedelta(days=7)).isoformat()
-    hoy_iso = datetime.date.today().isoformat()
+    semana_anterior = (lunes - datetime.timedelta(days=7)).strftime('%d/%m/%Y')
+    semana_siguiente = (lunes + datetime.timedelta(days=7)).strftime('%d/%m/%Y')
+    hoy_str = datetime.date.today().strftime('%d/%m/%Y')
 
     # Citas médicas de la semana (Lunes a Viernes)
     citas_semana = list(
@@ -124,7 +123,7 @@ def index(request):
         dias_semana.append({
             'nombre': nombres_dias[i],
             'fecha': dia_fecha,
-            'fecha_str': dia_fecha.strftime('%d/%m'),
+            'fecha_str': dia_fecha.strftime('%d/%m/%Y'),
             'fecha_iso': dia_fecha.isoformat(),
             'slots': slots_dia,
         })
@@ -142,8 +141,9 @@ def index(request):
         'viernes': viernes,
         'semana_anterior': semana_anterior,
         'semana_siguiente': semana_siguiente,
-        'hoy_iso': hoy_iso,
-        'fecha_seleccionada': fecha_ref.isoformat(),
+        'hoy_str': hoy_str,
+        'hoy_iso': hoy_str,
+        'fecha_seleccionada': fecha_ref.strftime('%d/%m/%Y'),
         'rango_semana_str': rango_semana_str,
         'pacientes': pacientes,
         'doctores': doctores,
@@ -177,15 +177,43 @@ def cita_crear(request):
             messages.error(request, 'La fecha y la hora de inicio son requeridas.')
             return redirect('index')
         try:
-            fecha_val = datetime.date.fromisoformat(fecha_str)
+            fecha_val = parsear_fecha(fecha_str, obligatorio=True)
             hora_inicio_val = datetime.time.fromisoformat(hora_inicio_str)
             if hora_fin_str:
                 hora_fin_val = datetime.time.fromisoformat(hora_fin_str)
             else:
                 hora_fin_val = (datetime.datetime.combine(fecha_val, hora_inicio_val) + datetime.timedelta(hours=1)).time()
-        except ValueError:
-            messages.error(request, 'Formato de fecha u hora no válido.')
+        except ValueError as exc:
+            messages.error(request, str(exc) if 'fecha' in str(exc).lower() else 'Formato de fecha u hora no válido (use DD/MM/YYYY).')
             return redirect('index')
+
+        # Validar datos de paciente nuevo antes de guardar la cita
+        datos_nuevo_paciente = None
+        if tipo_paciente == 'nuevo':
+            nombre = request.POST.get('nombre_paciente', '').strip()
+            primer_apellido = request.POST.get('primer_apellido_paciente', '').strip()
+            segundo_apellido = request.POST.get('segundo_apellido_paciente', '').strip()
+            rut_raw = request.POST.get('rut_paciente', '').strip()
+            telefono_raw = request.POST.get('telefono_paciente', '').strip()
+            correo = request.POST.get('correo_paciente', '').strip()
+            fecha_nacimiento_str = request.POST.get('fecha_nacimiento_paciente', '').strip()
+            try:
+                rut = validar_rut(rut_raw)
+                telefono = formatear_telefono_cl(telefono_raw)
+                fecha_nacimiento = parsear_fecha(fecha_nacimiento_str)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect('index')
+            datos_nuevo_paciente = {
+                'nombre': nombre,
+                'primer_apellido': primer_apellido,
+                'segundo_apellido': segundo_apellido,
+                'rut': rut,
+                'telefono': telefono,
+                'correo': correo,
+                'fecha_nacimiento': fecha_nacimiento,
+            }
+
         doctor = None
         if doctor_id:
             doctor = Doctor.objects.filter(id_doctor=doctor_id).first()
@@ -200,20 +228,15 @@ def cita_crear(request):
         )
         nueva_cita.save()
         # Vincular o crear paciente
-        if tipo_paciente == 'nuevo':
-            nombre = request.POST.get('nombre_paciente', '').strip()
-            primer_apellido = request.POST.get('primer_apellido_paciente', '').strip()
-            segundo_apellido = request.POST.get('segundo_apellido_paciente', '').strip()
-            rut = request.POST.get('rut_paciente', '').strip()
-            telefono = request.POST.get('telefono_paciente', '').strip()
-            correo = request.POST.get('correo_paciente', '').strip()
-            fecha_nacimiento_str = request.POST.get('fecha_nacimiento_paciente', '').strip()
-            fecha_nacimiento = None
-            if fecha_nacimiento_str:
-                try:
-                    fecha_nacimiento = datetime.date.fromisoformat(fecha_nacimiento_str)
-                except ValueError:
-                    fecha_nacimiento = None
+        paciente_vinculado = None
+        if tipo_paciente == 'nuevo' and datos_nuevo_paciente:
+            nombre = datos_nuevo_paciente['nombre']
+            primer_apellido = datos_nuevo_paciente['primer_apellido']
+            segundo_apellido = datos_nuevo_paciente['segundo_apellido']
+            rut = datos_nuevo_paciente['rut']
+            telefono = datos_nuevo_paciente['telefono']
+            correo = datos_nuevo_paciente['correo']
+            fecha_nacimiento = datos_nuevo_paciente['fecha_nacimiento']
             if nombre and primer_apellido:
                 paciente_existente = None
                 if rut:
@@ -222,26 +245,46 @@ def cita_crear(request):
                     paciente_existente.id_cita = nueva_cita
                     if fecha_nacimiento and not paciente_existente.fecha_nacimiento:
                         paciente_existente.fecha_nacimiento = fecha_nacimiento
+                    if telefono and not paciente_existente.telefono:
+                        paciente_existente.telefono = telefono
                     paciente_existente.save()
+                    paciente_vinculado = paciente_existente
                 else:
                     nuevo_p = Paciente(
                         id_paciente=_obtener_siguiente_id(Paciente, 'id_paciente'),
-                        rut=rut if rut else None,
+                        rut=rut,
                         nombre=nombre,
                         primer_apellido=primer_apellido,
                         segundo_apellido=segundo_apellido,
-                        telefono=telefono if telefono else None,
+                        telefono=telefono,
                         correo=correo if correo else None,
                         fecha_nacimiento=fecha_nacimiento,
                         id_cita=nueva_cita,
                         activo=True
                     )
                     nuevo_p.save()
+                    paciente_vinculado = nuevo_p
         elif paciente_id:
             paciente = Paciente.objects.filter(id_paciente=paciente_id).first()
             if paciente:
                 paciente.id_cita = nueva_cita
                 paciente.save()
+                paciente_vinculado = paciente
+        # Notificar por WhatsApp al número del paciente al agendar una nueva cita
+        if nueva_cita.estado != 'Cancelada' and paciente_vinculado and paciente_vinculado.telefono:
+            resultado_ws = enviar_recordatorio_whatsapp(
+                telefono_paciente=paciente_vinculado.telefono,
+                nombre_paciente=paciente_vinculado.nombre,
+                fecha_cita=nueva_cita.fecha,
+                hora_cita=nueva_cita.hora_inicio,
+            )
+            if resultado_ws.get('ok'):
+                messages.info(request, f'Mensaje de WhatsApp enviado a {paciente_vinculado.telefono}.')
+            else:
+                messages.warning(
+                    request,
+                    f"No se pudo enviar el WhatsApp al paciente: {resultado_ws.get('error')}",
+                )
         # Registro en Calendario si aplica
         try:
             meses_nombres = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -255,7 +298,7 @@ def cita_crear(request):
         except Exception:
             pass
         messages.success(request, f'Cita médica agendada correctamente para el {nueva_cita.fecha.strftime("%d/%m/%Y")} a las {nueva_cita.hora_inicio.strftime("%H:%M")}.')
-        return redirect(f"{redirect('index').url}?fecha={nueva_cita.fecha.isoformat()}")
+        return redirect(f"{redirect('index').url}?fecha={nueva_cita.fecha.strftime('%d/%m/%Y')}")
     return redirect('index')
 
 @login_required(login_url='login')
@@ -272,12 +315,16 @@ def cita_editar(request, id_cita):
         estado = request.POST.get('estado', 'Pendiente')
         doctor_id = request.POST.get('id_doctor')
         paciente_id = request.POST.get('id_paciente')
-        if fecha_str:
-            cita.fecha = datetime.date.fromisoformat(fecha_str)
-        if hora_inicio_str:
-            cita.hora_inicio = datetime.time.fromisoformat(hora_inicio_str)
-        if hora_fin_str:
-            cita.hora_fin = datetime.time.fromisoformat(hora_fin_str)
+        try:
+            if fecha_str:
+                cita.fecha = parsear_fecha(fecha_str, obligatorio=True)
+            if hora_inicio_str:
+                cita.hora_inicio = datetime.time.fromisoformat(hora_inicio_str)
+            if hora_fin_str:
+                cita.hora_fin = datetime.time.fromisoformat(hora_fin_str)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect('index')
         cita.motivo_consulta = motivo
         cita.estado = estado
         if doctor_id:
@@ -292,7 +339,7 @@ def cita_editar(request, id_cita):
                 paciente.id_cita = cita
                 paciente.save()
         messages.success(request, 'Cita médica modificada exitosamente.')
-        return redirect(f"{redirect('index').url}?fecha={cita.fecha.isoformat()}")
+        return redirect(f"{redirect('index').url}?fecha={cita.fecha.strftime('%d/%m/%Y')}")
     return redirect('index')
 
 @login_required(login_url='login')
@@ -301,14 +348,14 @@ def cita_eliminar(request, id_cita):
     Elimina una cita médica y desvincula al paciente.
     """
     cita = get_object_or_404(CitaMedica, id_cita=id_cita)
-    fecha_iso = cita.fecha.isoformat() if cita.fecha else ''
+    fecha_str = cita.fecha.strftime('%d/%m/%Y') if cita.fecha else ''
     if request.method == 'POST':
         Paciente.objects.filter(id_cita=cita).update(id_cita=None)
         Calendario.objects.filter(id_cita=cita).delete()
         cita.delete()
         messages.success(request, 'Cita médica eliminada correctamente.')
-        if fecha_iso:
-            return redirect(f"{redirect('index').url}?fecha={fecha_iso}")
+        if fecha_str:
+            return redirect(f"{redirect('index').url}?fecha={fecha_str}")
     return redirect('index')
 
 @login_required(login_url='login')
@@ -320,8 +367,8 @@ def paciente_crear(request):
         nombre = request.POST.get('nombre', '').strip()
         primer_apellido = request.POST.get('primer_apellido', '').strip()
         segundo_apellido = request.POST.get('segundo_apellido', '').strip()
-        rut = request.POST.get('rut', '').strip()
-        telefono = request.POST.get('telefono', '').strip()
+        rut_raw = request.POST.get('rut', '').strip()
+        telefono_raw = request.POST.get('telefono', '').strip()
         correo = request.POST.get('correo', '').strip()
         fecha_nacimiento_str = request.POST.get('fecha_nacimiento', '').strip()
 
@@ -336,9 +383,11 @@ def paciente_crear(request):
             return redirect(redirect_target)
 
         try:
-            fecha_nacimiento = datetime.date.fromisoformat(fecha_nacimiento_str)
-        except ValueError:
-            messages.error(request, 'Formato de fecha de nacimiento inválido (debe ser AAAA-MM-DD).')
+            fecha_nacimiento = parsear_fecha(fecha_nacimiento_str, obligatorio=True)
+            rut = validar_rut(rut_raw)
+            telefono = formatear_telefono_cl(telefono_raw)
+        except ValueError as exc:
+            messages.error(request, str(exc))
             return redirect(redirect_target)
 
         if rut and Paciente.objects.filter(rut=rut).exists():
@@ -346,11 +395,11 @@ def paciente_crear(request):
             return redirect(redirect_target)
         paciente = Paciente(
             id_paciente=_obtener_siguiente_id(Paciente, 'id_paciente'),
-            rut=rut if rut else None,
+            rut=rut,
             nombre=nombre,
             primer_apellido=primer_apellido,
             segundo_apellido=segundo_apellido,
-            telefono=telefono if telefono else None,
+            telefono=telefono,
             correo=correo if correo else None,
             fecha_nacimiento=fecha_nacimiento,
             activo=True
@@ -387,13 +436,23 @@ def paciente_editar(request, id_paciente):
         nombre = request.POST.get('nombre', '').strip()
         primer_apellido = request.POST.get('primer_apellido', '').strip()
         segundo_apellido = request.POST.get('segundo_apellido', '').strip()
-        rut = request.POST.get('rut', '').strip()
-        telefono = request.POST.get('telefono', '').strip()
+        rut_raw = request.POST.get('rut', '').strip()
+        telefono_raw = request.POST.get('telefono', '').strip()
         correo = request.POST.get('correo', '').strip()
         fecha_nacimiento_str = request.POST.get('fecha_nacimiento', '').strip()
         activo_str = request.POST.get('activo')
         if not nombre or not primer_apellido:
             messages.error(request, 'El nombre y primer apellido son obligatorios.')
+            return redirect('pacientes')
+        if not fecha_nacimiento_str:
+            messages.error(request, 'La fecha de nacimiento es obligatoria.')
+            return redirect('pacientes')
+        try:
+            fecha_nacimiento = parsear_fecha(fecha_nacimiento_str, obligatorio=True)
+            rut = validar_rut(rut_raw)
+            telefono = formatear_telefono_cl(telefono_raw)
+        except ValueError as exc:
+            messages.error(request, str(exc))
             return redirect('pacientes')
         # Verificar si el RUT ya está en uso por otro paciente
         if rut and Paciente.objects.filter(rut=rut).exclude(id_paciente=id_paciente).exists():
@@ -402,17 +461,10 @@ def paciente_editar(request, id_paciente):
         paciente.nombre = nombre
         paciente.primer_apellido = primer_apellido
         paciente.segundo_apellido = segundo_apellido
-        paciente.rut = rut if rut else None
-        paciente.telefono = telefono if telefono else None
+        paciente.rut = rut
+        paciente.telefono = telefono
         paciente.correo = correo if correo else None
-        if not fecha_nacimiento_str:
-            messages.error(request, 'La fecha de nacimiento es obligatoria.')
-            return redirect('pacientes')
-        try:
-            paciente.fecha_nacimiento = datetime.date.fromisoformat(fecha_nacimiento_str)
-        except ValueError:
-            messages.error(request, 'Formato de fecha de nacimiento inválido.')
-            return redirect('pacientes')
+        paciente.fecha_nacimiento = fecha_nacimiento
         if activo_str is not None:
             paciente.activo = activo_str in ['true', '1', 'True', True, 'on']
         paciente.save()
@@ -421,3 +473,38 @@ def paciente_editar(request, id_paciente):
     return redirect('pacientes')
 # Alias para compatibilidad
 pacientes_modify = paciente_editar
+
+
+@login_required(login_url='login')
+def whatsapp_prueba(request):
+    """
+    Envía un mensaje de prueba vía WhatsApp Cloud API para verificar la integración.
+    """
+    if request.method == 'POST':
+        telefono = request.POST.get('telefono', '').strip()
+        modo = request.POST.get('modo', 'plantilla').strip()
+        nombre_paciente = request.POST.get('nombre_paciente', '').strip() or 'Paciente de Prueba'
+        mensaje = request.POST.get('mensaje', '').strip() or None
+
+        if modo not in ('plantilla', 'texto'):
+            modo = 'plantilla'
+
+        resultado = mensaje_prueba(
+            telefono_paciente=telefono,
+            nombre_paciente=nombre_paciente,
+            modo=modo,
+            mensaje=mensaje,
+        )
+
+        if resultado['ok']:
+            msg_id = resultado.get('message_id') or 'enviado'
+            messages.success(
+                request,
+                f'Mensaje de prueba de WhatsApp enviado exitosamente a {telefono} (ID: {msg_id}).',
+            )
+        else:
+            messages.error(
+                request,
+                f"No se pudo enviar el mensaje de prueba de WhatsApp: {resultado.get('error')}",
+            )
+    return redirect('index')

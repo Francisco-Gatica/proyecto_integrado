@@ -1,0 +1,13 @@
+# Python bytecode y cachés
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales y secretos locales
+.env
+venv/
+.venv/
+
+# Base de datos local
+db.sqlite3

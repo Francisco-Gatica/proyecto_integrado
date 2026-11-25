@@ -51,7 +51,7 @@ function toggleFormPaciente(tipo) {
 /**
  * Abre el modal con el detalle de la cita para visualizarla o modificarla.
  * @param {number|string} idCita - ID de la cita
- * @param {string} fecha - Fecha en formato YYYY-MM-DD
+ * @param {string} fecha - Fecha en formato DD/MM/YYYY
  * @param {string} horaInicio - Hora de inicio en formato HH:MM
  * @param {string} horaFin - Hora de término en formato HH:MM
  * @param {number|string} doctorId - ID del doctor asignado
@@ -188,3 +188,110 @@ window.abrirModalDetalleCita = abrirModalDetalleCita;
 window.solicitarEliminarCita = solicitarEliminarCita;
 window.filtrarTablaPacientes = filtrarTablaPacientes;
 window.abrirModalEditarPaciente = abrirModalEditarPaciente;
+
+function esFechaValidaDDMMYYYY(valor) {
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((valor || '').trim());
+    if (!match) return false;
+    const dia = parseInt(match[1], 10);
+    const mes = parseInt(match[2], 10);
+    const anio = parseInt(match[3], 10);
+    const fecha = new Date(anio, mes - 1, dia);
+    return (
+        fecha.getFullYear() === anio &&
+        fecha.getMonth() === mes - 1 &&
+        fecha.getDate() === dia
+    );
+}
+
+function aplicarMascaraFecha(input) {
+    const digitos = input.value.replace(/\D/g, '').slice(0, 8);
+    let formateado = digitos;
+    if (digitos.length > 4) {
+        formateado = `${digitos.slice(0, 2)}/${digitos.slice(2, 4)}/${digitos.slice(4)}`;
+    } else if (digitos.length > 2) {
+        formateado = `${digitos.slice(0, 2)}/${digitos.slice(2)}`;
+    }
+    input.value = formateado;
+
+    if (formateado.length === 0) {
+        input.setCustomValidity('');
+    } else if (!esFechaValidaDDMMYYYY(formateado)) {
+        input.setCustomValidity('Ingrese una fecha válida en formato DD/MM/YYYY.');
+    } else {
+        input.setCustomValidity('');
+    }
+}
+
+function validarInputRut(input) {
+    let valor = input.value.replace(/[^0-9kK-]/g, '').toUpperCase();
+    // Si hay más de un guión, conservar solo el primero
+    const partes = valor.split('-');
+    if (partes.length > 2) {
+        valor = `${partes[0]}-${partes.slice(1).join('')}`;
+    }
+    input.value = valor;
+
+    if (!valor) {
+        input.setCustomValidity('');
+    } else if (!/^\d{7,8}-[0-9K]$/.test(valor)) {
+        input.setCustomValidity('El RUT debe tener formato 11111111-1 (sin puntos y con guión).');
+    } else {
+        input.setCustomValidity('');
+    }
+}
+
+function formatearYValidarTelefono(input) {
+    let digitos = input.value.replace(/\D/g, '');
+    if (!digitos) {
+        input.value = '';
+        input.setCustomValidity('');
+        return;
+    }
+
+    if (digitos.startsWith('56')) {
+        digitos = digitos.slice(2);
+    }
+    digitos = digitos.slice(0, 9);
+
+    let resultado = '+56';
+    if (digitos.length > 0) {
+        resultado += ` ${digitos.slice(0, 1)}`;
+    }
+    if (digitos.length > 1) {
+        resultado += ` ${digitos.slice(1, 5)}`;
+    }
+    if (digitos.length > 5) {
+        resultado += ` ${digitos.slice(5, 9)}`;
+    }
+    input.value = resultado;
+
+    if (!/^\+56 9 \d{4} \d{4}$/.test(resultado)) {
+        input.setCustomValidity('El teléfono debe tener formato +56 9 1111 1111.');
+    } else {
+        input.setCustomValidity('');
+    }
+}
+
+function irAFecha(valor) {
+    if (esFechaValidaDDMMYYYY(valor)) {
+        location.href = `?fecha=${encodeURIComponent(valor.trim())}`;
+    }
+}
+window.irAFecha = irAFecha;
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-date-mask="true"]').forEach((input) => {
+        input.addEventListener('input', () => aplicarMascaraFecha(input));
+        input.addEventListener('blur', () => aplicarMascaraFecha(input));
+    });
+
+    document.querySelectorAll('[data-rut-input="true"]').forEach((input) => {
+        input.addEventListener('input', () => validarInputRut(input));
+        input.addEventListener('blur', () => validarInputRut(input));
+    });
+
+    document.querySelectorAll('[data-phone-mask="true"]').forEach((input) => {
+        input.addEventListener('input', () => formatearYValidarTelefono(input));
+        input.addEventListener('blur', () => formatearYValidarTelefono(input));
+    });
+});

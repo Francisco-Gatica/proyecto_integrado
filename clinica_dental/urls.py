@@ -16,4 +16,6 @@ urlpatterns = [
     path('pacientes/', views.pacientes_view, name='pacientes'),
     path('pacientes/crear/', views.paciente_crear, name='paciente_crear'),
     path('pacientes/<int:id_paciente>/editar/', views.paciente_editar, name='paciente_editar'),
+    # WhatsApp
+    path('whatsapp/prueba/', views.whatsapp_prueba, name='whatsapp_prueba'),
 ]
